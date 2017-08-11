@@ -146,9 +146,18 @@ struct Data {
   byte time2[5];
 } data;
 
+struct Distance {
+  byte sourceID;
+  byte destID;
+  byte msgID;
+  uint16_t distance[4];
+} distanceToSend;
+
+uint16_t tempDistance[4] = {};
+
 
 #define LEN_DATA sizeof(data)
-
+#define LEN_DISTANCE_DATA sizeof(distanceToSend)
 // watchdog and reset period
 uint32_t lastActivity;
 uint32_t resetPeriod = 15;
@@ -207,6 +216,7 @@ FilterOnePole lowpassFilter1( LOWPASS, filterFrequency );
 FilterOnePole lowpassFilter2( LOWPASS, filterFrequency );
 FilterOnePole lowpassFilter3( LOWPASS, filterFrequency );
 //FilterTwoPole lowpassFilter( LOWPASS, filterFrequency );
+#define delayTime 2000
 
 void loop() {
   if (!sentAck && !receivedAck) {
@@ -218,6 +228,7 @@ void loop() {
     }
     return;
   }
+
   // continue on any success confirmation
   if (sentAck) {
     sentAck = false;
@@ -279,7 +290,6 @@ void loop() {
 
 
 
-
         nextAnchor();
         /*
             Serial.print("dest: ");
@@ -312,16 +322,39 @@ void loop() {
   }
 
 
+  //  delay(delayTime);
 }
 
+void sendDistance()
+{
 
+  DW1000.newTransmit();
+  DW1000.setDefaults();
+  distanceToSend = {};
+  distanceToSend.sourceID = senderID; //mine
+  distanceToSend.destID = 0x05; //only one receiver now
+  distanceToSend.msgID = RANGE_FAILED; //enum ID, just a number
 
+  for (int i = 0; i < 4; i++)
+  {
+    distanceToSend.distance[i] = tempDistance[i];
+    //    Serial.print((float)distanceToSend.distance[i]/10, 4);
+    //    Serial.print(",");
+  }
+  //  Serial.println();
+
+  DW1000.setData((byte*)&distanceToSend, LEN_DISTANCE_DATA);
+  DW1000.startTransmit();
+}
+
+//#define sampleCounter 10
+int enterCounter = 0;
 void nextAnchor() {
   if (anchorIndex < numOfAnchors - 1) {
     anchorIndex++;
   } else {
     anchorIndex = 0;
-
+    enterCounter++;
     /*Serial.print(distance[0], 4);
       distance[0] = -1;
       for (byte i = 1; i < numOfAnchors; i++) {
@@ -332,34 +365,53 @@ void nextAnchor() {
       Serial.println();*/
 
     if (distance[0] != -1) {
-      Serial.print(lowpassFilter0.output(), 4);
+      tempDistance[0] =  lowpassFilter0.output() / 10;
+      Serial.print((float)lowpassFilter0.output(), 4);
     } else {
-      Serial.print((float)(-1), 4);
+      tempDistance[0] = 0xFFFF;
+      Serial.print((float)(-1),4);
     }
     Serial.print(',');
 
-    if (distance[1] != -1) {
-      Serial.print(lowpassFilter1.output(), 4);
+    if (distance[1] != -1)  {
+      tempDistance[1] =  lowpassFilter1.output() / 10;
+      Serial.print((float)lowpassFilter1.output(), 4);
     } else {
-      Serial.print((float)(-1), 4);
+      tempDistance[1] = 0xFFFF;
+      Serial.print((float)(-1),4);
     }
     Serial.print(',');
 
-    if (distance[2] != -1) {
-      Serial.print(lowpassFilter2.output(), 4);
+    if (distance[2] != -1)  {
+      tempDistance[2] =  lowpassFilter2.output() / 10;
+      Serial.print((float)lowpassFilter2.output(), 4);
+      //      Serial.print(lowpassFilter2.output(), 4);
     } else {
-      Serial.print((float)(-1), 4);
+      tempDistance[2] = 0xFFFF;
+      Serial.print((float)(-1),4);
     }
     Serial.print(',');
 
-    if (distance[3] != -1) {
-      Serial.print(lowpassFilter3.output(), 4);
+    if (distance[3] != -1)  {
+      tempDistance[3] =  lowpassFilter3.output() / 10;
+      Serial.print((float)lowpassFilter3.output(), 4);
+      //      Serial.print(lowpassFilter3.output(), 4);
     } else {
-      Serial.print((float)(-1), 4);
+      tempDistance[3] = 0xFFFF;
+      Serial.print((float)(-1),4);
     }
-
-
     Serial.println();
+
+//    Serial.println(enterCounter);
+//    if (enterCounter == sampleCounter)
+//    {
+//      Serial.println("HELLO");
+//      enterCounter = 0;
+      sentAck = false;
+      sendDistance();
+      while (!sentAck);
+//    }
+
 
     for (byte i = 0; i < numOfAnchors; i++) {
       distance[i] = -1; //set invalid value, until updated with real value
