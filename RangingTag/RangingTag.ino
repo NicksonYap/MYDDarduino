@@ -20,6 +20,33 @@
 #include <SPI.h>
 #include <DW1000.h>
 
+#include <Filters.h>
+
+float filterFrequency = 1.0;
+//float filterFrequency = 0.05; //to apply heavy averaging
+/*
+
+  data set without correcting zero error
+
+  first data in meters,
+  second in nanoseconds
+  {30, 2.67},
+  {60, 4.07},
+  {90, 5.28},
+  {120, 6.56},
+  {150, 7.74},
+  {180, 9.03},
+  (210, 10.20},
+  {240, 11.41},
+  {270, 12.39},
+  {300, 13.25},
+  {330, 14.40}
+
+  linear trendline from excel:
+  distance = 25.542(timeNS) - 45.23
+
+
+*/
 // connection pins
 const uint8_t PIN_RST = 9; // reset pin
 const uint8_t PIN_IRQ = 2; // irq pin
@@ -101,16 +128,25 @@ void setup() {
 }
 
 
+#define numOfAnchors 4
 
-byte currDestID = 0x01; 
+byte anchorID[numOfAnchors] = {0x01, 0x02, 0x03, 0x04};
+byte anchorIndex = 0;
 
+byte currDestID = anchorID[anchorIndex]; //initialise destination as first anchor
+
+float distance[numOfAnchors] = {-1, -1, -1,-1}; //initialise as invalid
+
+FilterOnePole lowpassFilter[numOfAnchors]( LOWPASS, filterFrequency );
+//FilterTwoPole lowpassFilter( LOWPASS, filterFrequency );
 
 void loop() {
   if (!sentAck && !receivedAck) {
     // check if inactive
     if (millis() - lastActivity > resetPeriod) {
+      nextAnchor();
       resetInactive();
-      Serial.println("TIMEOUT");
+      //   Serial.println("TIMEOUT");
     }
     return;
   }
@@ -156,18 +192,20 @@ void loop() {
         DW1000Time tof;
         tof.setTimestamp(data.time1);
 
+        distance[anchorIndex] = tof.getAsMeters();
 
-     /*   Serial.print("dest: ");
-        Serial.print(data.destID);
+        nextAnchor();
+        /*
+            Serial.print("dest: ");
+            Serial.print(data.destID);
 
-        Serial.print("\t source: ");
-        Serial.print(data.sourceID);
-        Serial.print("\t tof (ns): ");*/
-        Serial.print(tof.getAsMicroSeconds()*1000, 4);
-       /* Serial.print("\t distance: ");
-        Serial.print(tof.getAsMeters(), 4);*/
-        Serial.println();
+            Serial.print("\t source: ");
+            Serial.print(data.sourceID);
+            Serial.print("\t distance: ");
 
+            Serial.print(distance[anchorIndex], 4);
+            Serial.println();
+        */
 
         /*   Serial.print(distance[0], 4);
            for (byte i = 1; i < numOfAnchors; i++) {
@@ -179,6 +217,7 @@ void loop() {
         transmitPoll();
         noteActivity();
       } else if (msgId == RANGE_FAILED) {
+        nextAnchor();
         expectedMsgId = POLL_ACK;
         transmitPoll();
         noteActivity();
@@ -191,6 +230,26 @@ void loop() {
 
 
 
+void nextAnchor() {
+  if (anchorIndex < numOfAnchors - 1) {
+    anchorIndex++;
+  } else {
+    anchorIndex = 0;
+    Serial.print(distance[0], 4);
+    distance[0] = -1;
+    for (byte i = 1; i < numOfAnchors; i++) {
+      Serial.print(',');
+      Serial.print(distance[i], 4); //print first
+      distance[i] = -1; //then set invalid value
+    }
+    Serial.println();
+
+
+
+  }
+  currDestID = anchorID[anchorIndex];
+  // Serial.println(currDestID, HEX);
+}
 
 
 
