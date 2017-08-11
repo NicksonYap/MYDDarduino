@@ -22,28 +22,93 @@
 
 #include <Filters.h>
 
-float filterFrequency = 1.0;
+float filterFrequency = 0.25;
 //float filterFrequency = 0.05; //to apply heavy averaging
+
 /*
 
+  for 0x01
   data set without correcting zero error
-
-  first data in meters,
-  second in nanoseconds
-  {30, 2.67},
-  {60, 4.07},
-  {90, 5.28},
-  {120, 6.56},
-  {150, 7.74},
-  {180, 9.03},
-  (210, 10.20},
-  {240, 11.41},
-  {270, 12.39},
-  {300, 13.25},
-  {330, 14.40}
+  meter nanosesconds
+  30    2.67
+  60    4.07
+  90    5.28
+  120   6.56
+  150   7.74
+  180   9.03
+  210   10.20
+  240   11.41
+  270   12.39
+  300   13.25
+  330   14.40
 
   linear trendline from excel:
   distance = 25.542(timeNS) - 45.23
+
+
+  for 0x02
+  data set without correcting zero error
+  meter nanosesconds
+  390   16.35
+  360   15.31
+  330   14.21
+  300   12.80
+  270   11.77
+  210   10.84
+  210   9.77
+  180   8.85
+  150   7.61
+  120   6.42
+  90    5.02
+  60    3.87
+  30    2.67
+
+  linear trendline from excel: (point at 300 excluded)
+  distance = 26.43(timeNS) - 45.699
+
+
+
+  for 0x03
+  data set without correcting zero error
+  meter nanosesconds
+  390   16.90
+  360   15.37
+  330   14.17
+  300   12.75
+  270   12.10
+  210   10.95
+  210   9.60
+  180   8.62
+  150   7.41
+  120   6.07
+  90    4.86
+  60    3.64
+  30    2.29
+
+  linear trendline from excel: (point at 300 excluded)
+  distance = 25.178(timeNS) - 32.448
+
+
+  for 0x04
+  data set without correcting zero error
+  meter nanosesconds
+  390   16.90
+  360   15.27
+  330   14.06
+  300   12.48
+  270   12.15
+  210   10.82
+  210   9.55
+  180   8.75
+  150   7.45
+  120   6.07
+  90    4.92
+  60    3.72
+  30    2.44
+
+  linear trendline from excel:
+  distance = 25.499(timeNS) - 35.706
+
 
 
 */
@@ -135,9 +200,12 @@ byte anchorIndex = 0;
 
 byte currDestID = anchorID[anchorIndex]; //initialise destination as first anchor
 
-float distance[numOfAnchors] = {-1, -1, -1,-1}; //initialise as invalid
+float distance[numOfAnchors] = { -1, -1, -1, -1}; //initialise as invalid
 
-FilterOnePole lowpassFilter[numOfAnchors]( LOWPASS, filterFrequency );
+FilterOnePole lowpassFilter0( LOWPASS, filterFrequency );
+FilterOnePole lowpassFilter1( LOWPASS, filterFrequency );
+FilterOnePole lowpassFilter2( LOWPASS, filterFrequency );
+FilterOnePole lowpassFilter3( LOWPASS, filterFrequency );
 //FilterTwoPole lowpassFilter( LOWPASS, filterFrequency );
 
 void loop() {
@@ -192,7 +260,25 @@ void loop() {
         DW1000Time tof;
         tof.setTimestamp(data.time1);
 
-        distance[anchorIndex] = tof.getAsMeters();
+        // distance[anchorIndex] = tof.getAsMeters();
+
+        //calibration for each anchor
+        if (anchorID[anchorIndex] == 0x01) {
+          distance[anchorIndex] = 25.542 * (tof.getAsMicroSeconds() * 1000) - 45.23;
+          lowpassFilter0.input(distance[anchorIndex]);
+        } else if (anchorID[anchorIndex] == 0x02) {
+          distance[anchorIndex] = 26.43 * (tof.getAsMicroSeconds() * 1000) - 45.699;
+          lowpassFilter1.input(distance[anchorIndex]);
+        } else if (anchorID[anchorIndex] == 0x03) {
+          distance[anchorIndex] = 25.178 * (tof.getAsMicroSeconds() * 1000) - 32.448;
+          lowpassFilter2.input(distance[anchorIndex]);
+        } else if (anchorID[anchorIndex] == 0x04) {
+          distance[anchorIndex] = 25.499 * (tof.getAsMicroSeconds() * 1000) - 35.706;
+          lowpassFilter3.input(distance[anchorIndex]);
+        }
+
+
+
 
         nextAnchor();
         /*
@@ -235,16 +321,49 @@ void nextAnchor() {
     anchorIndex++;
   } else {
     anchorIndex = 0;
-    Serial.print(distance[0], 4);
-    distance[0] = -1;
-    for (byte i = 1; i < numOfAnchors; i++) {
+
+    /*Serial.print(distance[0], 4);
+      distance[0] = -1;
+      for (byte i = 1; i < numOfAnchors; i++) {
       Serial.print(',');
       Serial.print(distance[i], 4); //print first
       distance[i] = -1; //then set invalid value
+      }
+      Serial.println();*/
+
+    if (distance[0] != -1) {
+      Serial.print(lowpassFilter0.output(), 4);
+    } else {
+      Serial.print((float)(-1), 4);
     }
+    Serial.print(',');
+
+    if (distance[1] != -1) {
+      Serial.print(lowpassFilter1.output(), 4);
+    } else {
+      Serial.print((float)(-1), 4);
+    }
+    Serial.print(',');
+
+    if (distance[2] != -1) {
+      Serial.print(lowpassFilter2.output(), 4);
+    } else {
+      Serial.print((float)(-1), 4);
+    }
+    Serial.print(',');
+
+    if (distance[3] != -1) {
+      Serial.print(lowpassFilter3.output(), 4);
+    } else {
+      Serial.print((float)(-1), 4);
+    }
+
+
     Serial.println();
 
-
+    for (byte i = 0; i < numOfAnchors; i++) {
+      distance[i] = -1; //set invalid value, until updated with real value
+    }
 
   }
   currDestID = anchorID[anchorIndex];
