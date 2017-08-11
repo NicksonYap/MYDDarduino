@@ -29,7 +29,7 @@ if(numel(instrfind) > 0)
 end
 
 s = serial('COM5');
-set(s,'Timeout',1);
+set(s,'Timeout',5);
 set(s,'DataBits',8);
 set(s,'StopBits',1);
 set(s,'BaudRate',115200);
@@ -37,6 +37,8 @@ set(s,'Parity','none');
 s.ReadAsyncMode='continuous';
 fopen(s);
 drawLoc = 0;
+
+sampleCount = 0;
 while(1)
     f = fscanf(s, '%f,%f,%f,%f\n');
     if(numel(f) == 4)
@@ -53,10 +55,20 @@ while(1)
             [x, y, z] = three_tri(Reader(1, 1), Reader(1, 2), Reader(1, 3), Distance(1), Reader(2,1), Reader(2, 2), Reader(2, 3), Distance(2), Reader(3, 1), Reader(3, 2), Reader(3, 3),Distance(3), Reader(4, 1), Reader(4, 2), Reader(4, 3), Distance(4));
             drawLoc = scatter3(x, y, z, 'MarkerEdgeColor', [0 0 1], 'MarkerFaceColor', [0 0 1]);
             drawnow;
+            
+            sampleCount = sampleCount + 1;
+            
+            if(sampleCount >= 10)
+                response = webwrite('http://api.seamlesshq.com/tests/MYDD3dpos','x', x, 'y', y, 'z', z);
+                disp(response);
+                sampleCount= 0;
+            end
         end
        
     end
     disp(f);
+    %response = webwrite('https://requestb.in/st2nilst','f1',f(1));
+    %disp(response);
 end
 fclose(s);
 fclose(instrfind); 
