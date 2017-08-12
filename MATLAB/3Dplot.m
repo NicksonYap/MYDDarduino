@@ -1,11 +1,12 @@
 %prevents rounding when displaying fractions
 format long
 %Reader 3-D Coordinates [x, y, z]
-Reader = [0,0,0; 0,0,242; 0,206,242; 422,206,242];
+%Reader = [0,0,0; 0,0,242*4; 0,206*4,242*4; 422*4,206*4,242*4];
+Reader = [530,600,300; 530,600,0; 0,600,0; 0, 0, 0];
 %plot reader locations
 figure(gcf)
 scatter3(getcolumn(Reader(1:4,1:3),1),getcolumn(Reader(1:4,1:3),2),getcolumn(Reader(1:4,1:3),3), 'MarkerEdgeColor', [1 0 0], 'MarkerFaceColor', [1 0 0]);
-axis([-50 500 -50 500 -50 500]) %set axis for 2-D graphs
+axis([-50 1000 -50 1000 -50 1000]) %set axis for 2-D graphs
 rotate3d;
 drawnow;
 %x = 0;0;0;
